@@ -22,7 +22,7 @@ export async function listCourses() {
 }
 
 // Detalhes do curso 
-export async function getCourseById(id: string) {
+export async function getCourseById(id: number) {
   const courseResult = await pool.query(
     `SELECT id, title, category, description, thumbnail
      FROM courses WHERE id = $1`,
