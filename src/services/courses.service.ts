@@ -33,20 +33,27 @@ export async function getCourseById(id: string) {
   if (!course) return null;
 
   const modulesResult = await pool.query(
-    `SELECT id, title FROM modules WHERE course_id = $1 ORDER BY position`,
+    `SELECT id, title, position FROM modules WHERE course_id = $1 ORDER BY position`,
     [course.id]
   );
 
   const modules = [];
   for (const mod of modulesResult.rows) {
     const lessonsResult = await pool.query(
-      `SELECT id, title FROM lessons WHERE module_id = $1 ORDER BY position`,
+      `SELECT id, title, description, duration, position FROM lessons WHERE module_id = $1 ORDER BY position`,
       [mod.id]
     );
     modules.push({
       id: String(mod.id),
       title: mod.title,
-      lessons: lessonsResult.rows.map((l) => ({ id: String(l.id), title: l.title })),
+      order: mod.position,
+      lessons: lessonsResult.rows.map((l) => ({
+        id: String(l.id),
+        title: l.title,
+        description: l.description,
+        duration: l.duration,
+        order: l.position
+      })),
     });
   }
 
