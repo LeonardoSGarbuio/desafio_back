@@ -14,7 +14,15 @@ export async function getCourses(req: Request, res: Response) {
 export async function getCourseByIdHandler(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const course = await getCourseById(id);
+
+    // Validação da entrada
+    const courseId = Number(id);
+    if (!Number.isInteger(courseId) || courseId <= 0) {
+      res.status(400).json({ message: 'ID de curso inválido.' });
+      return;
+    }
+
+    const course = await getCourseById(courseId);
 
     if (!course) {
       res.status(404).json({ message: 'Curso não encontrado' });
