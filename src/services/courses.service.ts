@@ -1,61 +1,61 @@
-import { pool } from '../config/db';
+import { prisma } from '../config/prisma';
 
 // Lista de cursos 
 export async function listCourses() {
-  const result = await pool.query(`
-    SELECT c.id, c.title, c.category, c.description, c.thumbnail,
-           COUNT(m.id)::int AS "modulesCount"
-    FROM courses c
-    LEFT JOIN modules m ON m.course_id = c.id
-    GROUP BY c.id
-    ORDER BY c.id
-  `);
+  const courses = await prisma.course.findMany({
+    select: {
+      id: true,
+      title: true,
+      category: true,
+      description: true,
+      thumbnail: true,
+      _count: { select: { modules: true } },
+    },
+    orderBy: { id: 'asc' },
+  });
 
-  return result.rows.map((row) => ({
-    id: String(row.id),
-    title: row.title,
-    category: row.category,
-    shortDescription: row.description,
-    thumbnail: row.thumbnail,
-    modulesCount: row.modulesCount,
+  return courses.map((course) => ({
+    id: String(course.id),
+    title: course.title,
+    category: course.category,
+    shortDescription: course.description,
+    thumbnail: course.thumbnail,
+    modulesCount: course._count.modules,
   }));
 }
 
 // Detalhes do curso 
 export async function getCourseById(id: number) {
-  const courseResult = await pool.query(
-    `SELECT id, title, category, description, thumbnail
-     FROM courses WHERE id = $1`,
-    [id]
-  );
+  const course = await prisma.course.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      title: true,
+      category: true,
+      description: true,
+      thumbnail: true,
+      modules: {
+        orderBy: { position: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          position: true,
+          lessons: {
+            orderBy: { position: 'asc' },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              duration: true,
+              position: true,
+            },
+          },
+        },
+      },
+    },
+  });
 
-  const course = courseResult.rows[0];
   if (!course) return null;
-
-  const modulesResult = await pool.query(
-    `SELECT id, title, position FROM modules WHERE course_id = $1 ORDER BY position`,
-    [course.id]
-  );
-
-  const modules = [];
-  for (const mod of modulesResult.rows) {
-    const lessonsResult = await pool.query(
-      `SELECT id, title, description, duration, position FROM lessons WHERE module_id = $1 ORDER BY position`,
-      [mod.id]
-    );
-    modules.push({
-      id: String(mod.id),
-      title: mod.title,
-      order: mod.position,
-      lessons: lessonsResult.rows.map((l) => ({
-        id: String(l.id),
-        title: l.title,
-        description: l.description,
-        duration: l.duration,
-        order: l.position
-      })),
-    });
-  }
 
   return {
     id: String(course.id),
@@ -63,6 +63,17 @@ export async function getCourseById(id: number) {
     category: course.category,
     description: course.description,
     thumbnail: course.thumbnail,
-    modules,
+    modules: course.modules.map((mod) => ({
+      id: String(mod.id),
+      title: mod.title,
+      order: mod.position,
+      lessons: mod.lessons.map((lesson) => ({
+        id: String(lesson.id),
+        title: lesson.title,
+        description: lesson.description,
+        duration: lesson.duration,
+        order: lesson.position,
+      })),
+    })),
   };
 }
