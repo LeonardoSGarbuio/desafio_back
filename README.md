@@ -14,7 +14,7 @@ A API fornece a listagem geral dos cursos e a consulta detalhada de cada curso, 
 * **TypeScript**
 * **Express**: Framework web minimalista para criação das rotas e middlewares.
 * **PostgreSQL**: Banco de dados relacional para persistência dos dados.
-* **pg (node-postgres)**: Cliente PostgreSQL para execução direta de queries SQL.
+* **Prisma ORM**: Modelagem de dados, migrações automatizadas e consultas type-safe.
 * **tsx**: Executor TypeScript para ambiente de desenvolvimento sem etapa prévia de build manual.
 * **dotenv**: Gerenciamento de variáveis de ambiente.
 * **cors**: Middleware para liberação de requisições cross-origin para o frontend.
@@ -85,11 +85,13 @@ docker run --name comando-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=
 
 ## 6. Como Executar Migrations
 
-O projeto conta com um script automatizado que lê o arquivo `sql/schema.sql` e cria as tabelas `courses`, `modules` e `lessons` com os tipos e chaves estrangeiras (`ON DELETE CASCADE`):
+As migrações do banco de dados são gerenciadas pelo **Prisma Migrate** a partir do schema em `prisma/schema.prisma`:
 
 ```bash
 npm run migrate
 ```
+
+> O comando executa o `prisma migrate deploy`, aplicando todas as migrações versionadas de forma segura e sem alterar dados existentes.
 
 ---
 
