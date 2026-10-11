@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import coursesRouter from './routes/courses.routes';
 import modulesRouter from './routes/modules.routes';
+import lessonsRouter from './routes/lessons.routes';
 
 const app = express();
 
@@ -12,6 +13,7 @@ app.use(express.json());
 // Rotas da aplicação
 app.use('/courses', coursesRouter);
 app.use('/modules', modulesRouter);
+app.use('/lessons', lessonsRouter);
 
 // Rota de teste 
 app.get('/health', (req, res) => {
