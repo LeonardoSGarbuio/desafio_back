@@ -122,11 +122,35 @@ A API iniciará e estará acessível em:
 
 ## 9. Rotas Disponíveis
 
+### Cursos (`/courses`)
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| `GET` | `/courses` | Retorna a lista de cursos cadastrados |
+| `GET` | `/courses/:id` | Retorna os detalhes de um curso específico (com módulos e aulas ordenados) |
+| `POST` | `/courses` | Cria um novo curso |
+| `PUT` | `/courses/:id` | Atualiza os dados de um curso existente |
+| `DELETE` | `/courses/:id` | Remove um curso (e seus módulos/aulas em cascata) |
+
+### Módulos (`/modules`)
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| `GET` | `/modules/:id` | Retorna os detalhes de um módulo e suas aulas |
+| `POST` | `/modules` | Cria um novo módulo vinculado a um curso |
+| `PUT` | `/modules/:id` | Atualiza dados de um módulo existente |
+| `DELETE` | `/modules/:id` | Remove um módulo (e suas aulas em cascata) |
+
+### Aulas (`/lessons`)
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| `GET` | `/lessons/:id` | Retorna os detalhes de uma aula específica |
+| `POST` | `/lessons` | Cria uma nova aula vinculada a um módulo |
+| `PUT` | `/lessons/:id` | Atualiza dados de uma aula existente |
+| `DELETE` | `/lessons/:id` | Remove uma aula existente |
+
+### Utilitários
 | Método | Rota | Descrição |
 | :--- | :--- | :--- |
 | `GET` | `/health` | Verificação rápida de status do servidor |
-| `GET` | `/courses` | Retorna a lista de cursos cadastrados |
-| `GET` | `/courses/:id` | Retorna os detalhes de um curso específico (com módulos e aulas ordenados) |
 
 ---
 
@@ -139,7 +163,7 @@ A API iniciará e estará acessível em:
 curl -X GET http://localhost:3001/courses
 ```
 
-**Resposta de Sucesso (`200 OK`):**
+**Resposta (`200 OK`):**
 ```json
 [
   {
@@ -149,14 +173,6 @@ curl -X GET http://localhost:3001/courses
     "shortDescription": "Introdução prática ao desenvolvimento web, do front ao back.",
     "thumbnail": "https://exemplo.com/fullstack.jpg",
     "modulesCount": 2
-  },
-  {
-    "id": "2",
-    "title": "Banco de Dados com PostgreSQL",
-    "category": "Banco de Dados",
-    "shortDescription": "Modelagem, consultas e relacionamentos em PostgreSQL.",
-    "thumbnail": "https://exemplo.com/postgres.jpg",
-    "modulesCount": 1
   }
 ]
 ```
@@ -170,7 +186,7 @@ curl -X GET http://localhost:3001/courses
 curl -X GET http://localhost:3001/courses/1
 ```
 
-**Resposta de Sucesso (`200 OK`):**
+**Resposta (`200 OK`):**
 ```json
 {
   "id": "1",
@@ -190,27 +206,6 @@ curl -X GET http://localhost:3001/courses/1
           "description": "Como a internet funciona.",
           "duration": 15,
           "order": 1
-        },
-        {
-          "id": "2",
-          "title": "HTML e CSS",
-          "description": "Estrutura e estilo de páginas.",
-          "duration": 20,
-          "order": 2
-        }
-      ]
-    },
-    {
-      "id": "2",
-      "title": "Backend",
-      "order": 2,
-      "lessons": [
-        {
-          "id": "4",
-          "title": "Node.js",
-          "description": "Rodando JavaScript no servidor.",
-          "duration": 30,
-          "order": 1
         }
       ]
     }
@@ -220,18 +215,101 @@ curl -X GET http://localhost:3001/courses/1
 
 ---
 
-### 3. Tratamento de Erros
+### 3. Criação de Recursos (POST)
 
-* **Parâmetro Inválido (`400 Bad Request`)**  
-  Requisição com ID não numérico ou menor/igual a zero (ex: `GET /courses/abc` ou `GET /courses/0`):
+#### Criar Curso
+```bash
+curl -X POST http://localhost:3001/courses \
+  -H "Content-Type: application/json" \
+  -d '{"title": "DevOps Essencial", "category": "Infraestrutura", "description": "Do zero ao deploy"}'
+```
+
+*Resposta (`201 Created`):*
+```json
+{
+  "id": "4",
+  "title": "DevOps Essencial",
+  "description": "Do zero ao deploy",
+  "thumbnail": null,
+  "category": "Infraestrutura"
+}
+```
+
+#### Criar Módulo
+```bash
+curl -X POST http://localhost:3001/modules \
+  -H "Content-Type: application/json" \
+  -d '{"courseId": 4, "title": "Introdução a Containers", "order": 1}'
+```
+
+*Resposta (`201 Created`):*
+```json
+{
+  "id": "6",
+  "courseId": "4",
+  "title": "Introdução a Containers",
+  "order": 1
+}
+```
+
+#### Criar Aula
+```bash
+curl -X POST http://localhost:3001/lessons \
+  -H "Content-Type: application/json" \
+  -d '{"moduleId": 6, "title": "O que é Docker?", "duration": 15, "order": 1, "description": "Conceitos básicos"}'
+```
+
+*Resposta (`201 Created`):*
+```json
+{
+  "id": "13",
+  "moduleId": "6",
+  "title": "O que é Docker?",
+  "description": "Conceitos básicos",
+  "duration": 15,
+  "order": 1
+}
+```
+
+---
+
+### 4. Atualização e Exclusão (PUT e DELETE)
+
+#### Atualizar Recurso (`PUT`)
+```bash
+curl -X PUT http://localhost:3001/courses/4 \
+  -H "Content-Type: application/json" \
+  -d '{"title": "DevOps & Cloud Essencial"}'
+```
+
+*Resposta (`200 OK` com dados atualizados).*
+
+#### Deletar Recurso (`DELETE`)
+```bash
+curl -X DELETE http://localhost:3001/courses/4
+```
+
+*Resposta (`200 OK`):*
+```json
+{
+  "message": "Curso removido com sucesso."
+}
+```
+
+---
+
+### 5. Tratamento de Erros
+
+* **Parâmetro ou Campo Inválido (`400 Bad Request`)**  
+  Requisição com ID inválido ou campos obrigatórios ausentes:
   ```json
   {
     "message": "ID de curso inválido."
   }
   ```
 
-* **Curso Inexistente (`404 Not Found`)**  
-  Requisição com ID inexistente no banco (ex: `GET /courses/999`):
+* **Recurso Não Encontrado (`404 Not Found`)**  
+  Requisição com ID de curso, módulo ou aula inexistente:
   ```json
   {
     "message": "Curso não encontrado"
