@@ -6,6 +6,7 @@ import {
   updateCourse,
   deleteCourse,
 } from '../services/courses.service';
+import { uploadCourseThumbnail } from '../services/storage.service';
 
 export async function getCourses(req: Request, res: Response) {
   try {
@@ -50,17 +51,24 @@ export async function createCourseHandler(req: Request, res: Response) {
       return;
     }
 
+    // Se enviou um arquivo de imagem, faz upload no Supabase; senão, usa a URL em string (se enviada)
+    let thumbnailUrl: string | undefined = thumbnail ? String(thumbnail) : undefined;
+    if (req.file) {
+      thumbnailUrl = await uploadCourseThumbnail(req.file);
+    }
+
     const course = await createCourse({
       title: title.trim(),
       description: description ? String(description) : undefined,
-      thumbnail: thumbnail ? String(thumbnail) : undefined,
+      thumbnail: thumbnailUrl,
       category: category ? String(category) : undefined,
     });
 
     res.status(201).json(course);
   } catch (error) {
     console.error('Erro ao criar curso:', error);
-    res.status(500).json({ message: 'Erro interno ao criar curso' });
+    const message = error instanceof Error ? error.message : 'Erro interno ao criar curso';
+    res.status(500).json({ message });
   }
 }
 
@@ -87,17 +95,57 @@ export async function updateCourseHandler(req: Request, res: Response) {
       return;
     }
 
+    // Se enviou um arquivo de imagem novo, faz upload no Supabase; senão, usa a string (se enviada)
+    let thumbnailUrl: string | undefined =
+      thumbnail !== undefined ? String(thumbnail) : undefined;
+    if (req.file) {
+      thumbnailUrl = await uploadCourseThumbnail(req.file);
+    }
+
     const updatedCourse = await updateCourse(courseId, {
       title: title !== undefined ? title.trim() : undefined,
       description: description !== undefined ? String(description) : undefined,
-      thumbnail: thumbnail !== undefined ? String(thumbnail) : undefined,
+      thumbnail: thumbnailUrl,
       category: category !== undefined ? String(category) : undefined,
     });
 
     res.json(updatedCourse);
   } catch (error) {
     console.error('Erro ao atualizar curso:', error);
-    res.status(500).json({ message: 'Erro interno ao atualizar curso' });
+    const message = error instanceof Error ? error.message : 'Erro interno ao atualizar curso';
+    res.status(500).json({ message });
+  }
+}
+
+export async function updateCourseThumbnailHandler(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const courseId = Number(id);
+
+    if (!Number.isInteger(courseId) || courseId <= 0) {
+      res.status(400).json({ message: 'ID de curso inválido.' });
+      return;
+    }
+
+    const existingCourse = await getCourseById(courseId);
+    if (!existingCourse) {
+      res.status(404).json({ message: 'Curso não encontrado' });
+      return;
+    }
+
+    if (!req.file) {
+      res.status(400).json({ message: 'Nenhum arquivo de imagem foi enviado no campo thumbnail.' });
+      return;
+    }
+
+    const thumbnailUrl = await uploadCourseThumbnail(req.file);
+    const updatedCourse = await updateCourse(courseId, { thumbnail: thumbnailUrl });
+
+    res.json(updatedCourse);
+  } catch (error) {
+    console.error('Erro ao atualizar imagem do curso:', error);
+    const message = error instanceof Error ? error.message : 'Erro interno ao atualizar imagem do curso';
+    res.status(500).json({ message });
   }
 }
 
