@@ -3,16 +3,16 @@ import { getCache, setCache, invalidateCache } from './cache.service';
 
 export interface CreateCourseDTO {
   title: string;
-  description?: string;
-  thumbnail?: string;
-  category?: string;
+  description?: string | null;
+  thumbnail?: string | null;
+  category?: string | null;
 }
 
 export interface UpdateCourseDTO {
   title?: string;
-  description?: string;
-  thumbnail?: string;
-  category?: string;
+  description?: string | null;
+  thumbnail?: string | null;
+  category?: string | null;
 }
 
 const COURSES_LIST_CACHE_KEY = 'courses:all';

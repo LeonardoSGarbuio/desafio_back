@@ -8,6 +8,15 @@ import {
 } from '../services/courses.service';
 import { uploadCourseThumbnail } from '../services/storage.service';
 
+// Trata campos opcionais aceitando null com segurança (sem converter null na string "null")
+function parseOptionalField(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const str = String(value).trim();
+  if (str === '' || str === 'null') return null;
+  return str;
+}
+
 export async function getCourses(req: Request, res: Response) {
   try {
     const courses = await listCourses();
@@ -51,17 +60,16 @@ export async function createCourseHandler(req: Request, res: Response) {
       return;
     }
 
-    // Se enviou um arquivo de imagem, faz upload no Supabase; senão, usa a URL em string (se enviada)
-    let thumbnailUrl: string | undefined = thumbnail ? String(thumbnail) : undefined;
+    let thumbnailUrl: string | null | undefined = parseOptionalField(thumbnail);
     if (req.file) {
       thumbnailUrl = await uploadCourseThumbnail(req.file);
     }
 
     const course = await createCourse({
       title: title.trim(),
-      description: description ? String(description) : undefined,
+      description: parseOptionalField(description),
       thumbnail: thumbnailUrl,
-      category: category ? String(category) : undefined,
+      category: parseOptionalField(category),
     });
 
     res.status(201).json(course);
@@ -95,18 +103,16 @@ export async function updateCourseHandler(req: Request, res: Response) {
       return;
     }
 
-    // Se enviou um arquivo de imagem novo, faz upload no Supabase; senão, usa a string (se enviada)
-    let thumbnailUrl: string | undefined =
-      thumbnail !== undefined ? String(thumbnail) : undefined;
+    let thumbnailUrl: string | null | undefined = parseOptionalField(thumbnail);
     if (req.file) {
       thumbnailUrl = await uploadCourseThumbnail(req.file);
     }
 
     const updatedCourse = await updateCourse(courseId, {
       title: title !== undefined ? title.trim() : undefined,
-      description: description !== undefined ? String(description) : undefined,
+      description: parseOptionalField(description),
       thumbnail: thumbnailUrl,
-      category: category !== undefined ? String(category) : undefined,
+      category: parseOptionalField(category),
     });
 
     res.json(updatedCourse);
@@ -133,15 +139,25 @@ export async function updateCourseThumbnailHandler(req: Request, res: Response) 
       return;
     }
 
-    if (!req.file) {
-      res.status(400).json({ message: 'Nenhum arquivo de imagem foi enviado no campo thumbnail.' });
+    // Se enviou arquivo, faz upload no Supabase
+    if (req.file) {
+      const thumbnailUrl = await uploadCourseThumbnail(req.file);
+      const updatedCourse = await updateCourse(courseId, { thumbnail: thumbnailUrl });
+      res.json(updatedCourse);
       return;
     }
 
-    const thumbnailUrl = await uploadCourseThumbnail(req.file);
-    const updatedCourse = await updateCourse(courseId, { thumbnail: thumbnailUrl });
+    // Se enviou JSON com { thumbnail: null } ou URL em string
+    if (req.body && 'thumbnail' in req.body) {
+      const thumbnailUrl = parseOptionalField(req.body.thumbnail) ?? null;
+      const updatedCourse = await updateCourse(courseId, { thumbnail: thumbnailUrl });
+      res.json(updatedCourse);
+      return;
+    }
 
-    res.json(updatedCourse);
+    res.status(400).json({
+      message: 'Envie um arquivo de imagem ou o campo { "thumbnail": null } para remover a capa.',
+    });
   } catch (error) {
     console.error('Erro ao atualizar imagem do curso:', error);
     const message = error instanceof Error ? error.message : 'Erro interno ao atualizar imagem do curso';
