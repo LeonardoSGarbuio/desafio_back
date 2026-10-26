@@ -15,6 +15,7 @@ A API fornece a listagem geral dos cursos e a consulta detalhada de cada curso, 
 * **Express**: Framework web minimalista para criação das rotas e middlewares.
 * **PostgreSQL**: Banco de dados relacional para persistência dos dados.
 * **Prisma ORM**: Modelagem de dados, migrações automatizadas e consultas type-safe.
+* **Redis (`ioredis`)**: Camada de cache em memória (*Cache-Aside*) para as rotas de leitura, com invalidação automática em escritas e *fallback* transparente caso o Redis esteja offline.
 * **Multer & Supabase Storage**: Recebimento de arquivos (`multipart/form-data`) e armazenamento em nuvem para capas (thumbnails) dos cursos.
 * **tsx**: Executor TypeScript para ambiente de desenvolvimento sem etapa prévia de build manual.
 * **dotenv**: Gerenciamento de variáveis de ambiente.
@@ -49,11 +50,14 @@ Copie o arquivo de exemplo para criar o `.env` local:
 cp .env.example .env
 ```
 
-Abra o arquivo `.env` e configure as credenciais da sua conexão com o PostgreSQL, a porta da aplicação e (opcionalmente) as credenciais do Supabase Storage:
+Abra o arquivo `.env` e configure as credenciais da sua conexão com o PostgreSQL, a porta da aplicação e (opcionalmente) o Redis e o Supabase Storage:
 
 ```env
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/comando"
 PORT=3001
+
+# Opcional: URL do Redis para cache das rotas GET (padrão: redis://localhost:6379)
+REDIS_URL="redis://localhost:6379"
 
 # Opcional: necessário apenas para upload de arquivos de imagem (multipart/form-data)
 SUPABASE_URL="https://SEU_PROJETO.supabase.co"
@@ -63,11 +67,12 @@ SUPABASE_BUCKET="course-thumbnails"
 
 > **Nota de Integração**:
 > * A porta recomendada é `3001` para evitar conflito com a porta `3000` padrão utilizada pelo Next.js no frontend.
-> * Caso as variáveis do Supabase não sejam informadas, o cadastro e a edição de cursos continuam funcionando normalmente recebendo a URL da imagem em formato de texto via JSON.
+> * O **Redis** é opcional para subir o ambiente: caso não haja instância ativa na porta `6379`, a API segue operando normalmente consultando direto o PostgreSQL.
+> * Caso as variáveis do **Supabase** não sejam informadas, o cadastro e a edição de cursos continuam funcionando normalmente recebendo a URL da imagem em formato de texto via JSON.
 
 ---
 
-## 5. Como Configurar o Banco de Dados
+## 5. Como Configurar o Banco de Dados (e Cache Opcional)
 
 Certifique-se de que o serviço do PostgreSQL está ativo e crie uma base de dados chamada `comando`.
 
@@ -79,12 +84,16 @@ No terminal ou via `psql`:
 CREATE DATABASE comando;
 ```
 
-### Opção B: Via Docker
+### Opção B: Via Docker (PostgreSQL + Redis opcional)
 
-Caso prefira rodar um container rápido:
+Caso prefira rodar containers rápidos:
 
 ```bash
+# Banco de dados PostgreSQL (obrigatório)
 docker run --name comando-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=comando -p 5432:5432 -d postgres
+
+# Servidor de Cache Redis (opcional)
+docker run --name comando-redis -p 6379:6379 -d redis:alpine
 ```
 
 *(Nesse caso, a `DATABASE_URL` no `.env` seria `postgresql://postgres:postgres@localhost:5432/comando`).*
