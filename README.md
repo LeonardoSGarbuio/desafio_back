@@ -15,6 +15,7 @@ A API fornece a listagem geral dos cursos e a consulta detalhada de cada curso, 
 * **Express**: Framework web minimalista para criação das rotas e middlewares.
 * **PostgreSQL**: Banco de dados relacional para persistência dos dados.
 * **Prisma ORM**: Modelagem de dados, migrações automatizadas e consultas type-safe.
+* **Multer & Supabase Storage**: Recebimento de arquivos (`multipart/form-data`) e armazenamento em nuvem para capas (thumbnails) dos cursos.
 * **tsx**: Executor TypeScript para ambiente de desenvolvimento sem etapa prévia de build manual.
 * **dotenv**: Gerenciamento de variáveis de ambiente.
 * **cors**: Middleware para liberação de requisições cross-origin para o frontend.
@@ -48,14 +49,21 @@ Copie o arquivo de exemplo para criar o `.env` local:
 cp .env.example .env
 ```
 
-Abra o arquivo `.env` e configure as credenciais da sua conexão com o PostgreSQL e a porta da aplicação:
+Abra o arquivo `.env` e configure as credenciais da sua conexão com o PostgreSQL, a porta da aplicação e (opcionalmente) as credenciais do Supabase Storage:
 
 ```env
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/comando"
 PORT=3001
+
+# Opcional: necessário apenas para upload de arquivos de imagem (multipart/form-data)
+SUPABASE_URL="https://SEU_PROJETO.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="SUA_SECRET_KEY"
+SUPABASE_BUCKET="course-thumbnails"
 ```
 
-> **Nota de Integração**: A porta recomendada é `3001` para evitar conflito com a porta `3000` padrão utilizada pelo Next.js no frontend.
+> **Nota de Integração**:
+> * A porta recomendada é `3001` para evitar conflito com a porta `3000` padrão utilizada pelo Next.js no frontend.
+> * Caso as variáveis do Supabase não sejam informadas, o cadastro e a edição de cursos continuam funcionando normalmente recebendo a URL da imagem em formato de texto via JSON.
 
 ---
 
@@ -127,8 +135,9 @@ A API iniciará e estará acessível em:
 | :--- | :--- | :--- |
 | `GET` | `/courses` | Retorna a lista de cursos cadastrados |
 | `GET` | `/courses/:id` | Retorna os detalhes de um curso específico (com módulos e aulas ordenados) |
-| `POST` | `/courses` | Cria um novo curso |
-| `PUT` | `/courses/:id` | Atualiza os dados de um curso existente |
+| `POST` | `/courses` | Cria um novo curso (aceita JSON ou `multipart/form-data` com imagem no campo `thumbnail`) |
+| `PUT` | `/courses/:id` | Atualiza os dados de um curso existente (aceita JSON ou `multipart/form-data`) |
+| `PATCH` | `/courses/:id/thumbnail` | Atualiza exclusivamente a imagem de capa de um curso via upload (`multipart/form-data`) |
 | `DELETE` | `/courses/:id` | Remove um curso (e seus módulos/aulas em cascata) |
 
 ### Módulos (`/modules`)
@@ -217,7 +226,7 @@ curl -X GET http://localhost:3001/courses/1
 
 ### 3. Criação de Recursos (POST)
 
-#### Criar Curso
+#### Criar Curso (via JSON)
 ```bash
 curl -X POST http://localhost:3001/courses \
   -H "Content-Type: application/json" \
@@ -233,6 +242,15 @@ curl -X POST http://localhost:3001/courses \
   "thumbnail": null,
   "category": "Infraestrutura"
 }
+```
+
+#### Criar Curso enviando Arquivo de Imagem (`multipart/form-data`)
+```bash
+curl -X POST http://localhost:3001/courses \
+  -F "title=DevOps Essencial" \
+  -F "category=Infraestrutura" \
+  -F "description=Do zero ao deploy" \
+  -F "thumbnail=@./minha-capa.png"
 ```
 
 #### Criar Módulo
@@ -273,9 +291,9 @@ curl -X POST http://localhost:3001/lessons \
 
 ---
 
-### 4. Atualização e Exclusão (PUT e DELETE)
+### 4. Atualização, Upload de Capa e Exclusão (PUT, PATCH e DELETE)
 
-#### Atualizar Recurso (`PUT`)
+#### Atualizar Dados do Curso (`PUT`)
 ```bash
 curl -X PUT http://localhost:3001/courses/4 \
   -H "Content-Type: application/json" \
@@ -283,6 +301,14 @@ curl -X PUT http://localhost:3001/courses/4 \
 ```
 
 *Resposta (`200 OK` com dados atualizados).*
+
+#### Atualizar Apenas a Imagem do Curso (`PATCH`)
+```bash
+curl -X PATCH http://localhost:3001/courses/4/thumbnail \
+  -F "thumbnail=@./nova-capa.png"
+```
+
+*Resposta (`200 OK` retornando o curso com a nova URL pública do Supabase Storage).*
 
 #### Deletar Recurso (`DELETE`)
 ```bash
@@ -300,8 +326,8 @@ curl -X DELETE http://localhost:3001/courses/4
 
 ### 5. Tratamento de Erros
 
-* **Parâmetro ou Campo Inválido (`400 Bad Request`)**  
-  Requisição com ID inválido ou campos obrigatórios ausentes:
+* **Parâmetro, Campo ou Arquivo Inválido (`400 Bad Request`)**  
+  Requisição com ID inválido, campos obrigatórios ausentes ou arquivo fora do padrão (formatos diferentes de imagem ou maiores que 5MB):
   ```json
   {
     "message": "ID de curso inválido."
