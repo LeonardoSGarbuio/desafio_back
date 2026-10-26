@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma';
+import { getCache, setCache, invalidateCache } from './cache.service';
 
 export interface CreateModuleDTO {
   courseId: number;
@@ -18,8 +19,12 @@ export async function courseExists(courseId: number): Promise<boolean> {
   return count > 0;
 }
 
-// Busca módulo por ID incluindo suas aulas ordenadas
+// Busca módulo por ID incluindo suas aulas ordenadas (com cache)
 export async function getModuleById(id: number) {
+  const cacheKey = `modules:${id}`;
+  const cached = await getCache<Record<string, unknown>>(cacheKey);
+  if (cached) return cached;
+
   const module = await prisma.module.findUnique({
     where: { id },
     select: {
@@ -42,7 +47,7 @@ export async function getModuleById(id: number) {
 
   if (!module) return null;
 
-  return {
+  const result = {
     id: String(module.id),
     courseId: String(module.course_id),
     title: module.title,
@@ -55,9 +60,12 @@ export async function getModuleById(id: number) {
       order: lesson.position,
     })),
   };
+
+  await setCache(cacheKey, result);
+  return result;
 }
 
-// Cria um novo módulo
+// Cria um novo módulo e invalida o cache
 export async function createModule(data: CreateModuleDTO) {
   const module = await prisma.module.create({
     data: {
@@ -67,6 +75,8 @@ export async function createModule(data: CreateModuleDTO) {
     },
   });
 
+  await invalidateCache();
+
   return {
     id: String(module.id),
     courseId: String(module.course_id),
@@ -75,7 +85,7 @@ export async function createModule(data: CreateModuleDTO) {
   };
 }
 
-// Atualiza um módulo existente
+// Atualiza um módulo existente e invalida o cache
 export async function updateModule(id: number, data: UpdateModuleDTO) {
   const module = await prisma.module.update({
     where: { id },
@@ -86,6 +96,8 @@ export async function updateModule(id: number, data: UpdateModuleDTO) {
     },
   });
 
+  await invalidateCache();
+
   return {
     id: String(module.id),
     courseId: String(module.course_id),
@@ -94,9 +106,11 @@ export async function updateModule(id: number, data: UpdateModuleDTO) {
   };
 }
 
-// Deleta um módulo existente
+// Deleta um módulo existente e invalida o cache
 export async function deleteModule(id: number) {
   await prisma.module.delete({
     where: { id },
   });
+
+  await invalidateCache();
 }

@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma';
+import { getCache, setCache, invalidateCache } from './cache.service';
 
 export interface CreateLessonDTO {
   moduleId: number;
@@ -22,8 +23,12 @@ export async function moduleExists(moduleId: number): Promise<boolean> {
   return count > 0;
 }
 
-// Busca aula por ID
+// Busca aula por ID (com cache)
 export async function getLessonById(id: number) {
+  const cacheKey = `lessons:${id}`;
+  const cached = await getCache<Record<string, unknown>>(cacheKey);
+  if (cached) return cached;
+
   const lesson = await prisma.lesson.findUnique({
     where: { id },
     select: {
@@ -38,7 +43,7 @@ export async function getLessonById(id: number) {
 
   if (!lesson) return null;
 
-  return {
+  const result = {
     id: String(lesson.id),
     moduleId: String(lesson.module_id),
     title: lesson.title,
@@ -46,9 +51,12 @@ export async function getLessonById(id: number) {
     duration: lesson.duration,
     order: lesson.position,
   };
+
+  await setCache(cacheKey, result);
+  return result;
 }
 
-// Cria uma nova aula
+// Cria uma nova aula e invalida o cache
 export async function createLesson(data: CreateLessonDTO) {
   const lesson = await prisma.lesson.create({
     data: {
@@ -60,6 +68,8 @@ export async function createLesson(data: CreateLessonDTO) {
     },
   });
 
+  await invalidateCache();
+
   return {
     id: String(lesson.id),
     moduleId: String(lesson.module_id),
@@ -70,7 +80,7 @@ export async function createLesson(data: CreateLessonDTO) {
   };
 }
 
-// Atualiza uma aula existente
+// Atualiza uma aula existente e invalida o cache
 export async function updateLesson(id: number, data: UpdateLessonDTO) {
   const lesson = await prisma.lesson.update({
     where: { id },
@@ -83,6 +93,8 @@ export async function updateLesson(id: number, data: UpdateLessonDTO) {
     },
   });
 
+  await invalidateCache();
+
   return {
     id: String(lesson.id),
     moduleId: String(lesson.module_id),
@@ -93,9 +105,11 @@ export async function updateLesson(id: number, data: UpdateLessonDTO) {
   };
 }
 
-// Deleta uma aula existente
+// Deleta uma aula existente e invalida o cache
 export async function deleteLesson(id: number) {
   await prisma.lesson.delete({
     where: { id },
   });
+
+  await invalidateCache();
 }

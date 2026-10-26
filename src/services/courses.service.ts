@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma';
+import { getCache, setCache, invalidateCache } from './cache.service';
 
 export interface CreateCourseDTO {
   title: string;
@@ -14,8 +15,13 @@ export interface UpdateCourseDTO {
   category?: string;
 }
 
-// Lista todos os cursos
+const COURSES_LIST_CACHE_KEY = 'courses:all';
+
+// Lista todos os cursos (com cache)
 export async function listCourses() {
+  const cached = await getCache<ReturnType<typeof mapCoursesList>>(COURSES_LIST_CACHE_KEY);
+  if (cached) return cached;
+
   const courses = await prisma.course.findMany({
     select: {
       id: true,
@@ -28,6 +34,21 @@ export async function listCourses() {
     orderBy: { id: 'asc' },
   });
 
+  const result = mapCoursesList(courses);
+  await setCache(COURSES_LIST_CACHE_KEY, result);
+  return result;
+}
+
+function mapCoursesList(
+  courses: Array<{
+    id: number;
+    title: string;
+    category: string | null;
+    description: string | null;
+    thumbnail: string | null;
+    _count: { modules: number };
+  }>
+) {
   return courses.map((course) => ({
     id: String(course.id),
     title: course.title,
@@ -38,8 +59,12 @@ export async function listCourses() {
   }));
 }
 
-// Detalhes de um curso por ID (com módulos e aulas ordenados)
+// Detalhes de um curso por ID (com cache)
 export async function getCourseById(id: number) {
+  const cacheKey = `courses:${id}`;
+  const cached = await getCache<Record<string, unknown>>(cacheKey);
+  if (cached) return cached;
+
   const course = await prisma.course.findUnique({
     where: { id },
     select: {
@@ -71,7 +96,7 @@ export async function getCourseById(id: number) {
 
   if (!course) return null;
 
-  return {
+  const result = {
     id: String(course.id),
     title: course.title,
     category: course.category,
@@ -90,9 +115,12 @@ export async function getCourseById(id: number) {
       })),
     })),
   };
+
+  await setCache(cacheKey, result);
+  return result;
 }
 
-// Cria um novo curso
+// Cria um novo curso e invalida o cache
 export async function createCourse(data: CreateCourseDTO) {
   const course = await prisma.course.create({
     data: {
@@ -103,6 +131,8 @@ export async function createCourse(data: CreateCourseDTO) {
     },
   });
 
+  await invalidateCache();
+
   return {
     id: String(course.id),
     title: course.title,
@@ -112,13 +142,15 @@ export async function createCourse(data: CreateCourseDTO) {
   };
 }
 
-// Atualiza um curso existente
+// Atualiza um curso existente e invalida o cache
 export async function updateCourse(id: number, data: UpdateCourseDTO) {
   const course = await prisma.course.update({
     where: { id },
     data,
   });
 
+  await invalidateCache();
+
   return {
     id: String(course.id),
     title: course.title,
@@ -128,9 +160,11 @@ export async function updateCourse(id: number, data: UpdateCourseDTO) {
   };
 }
 
-// Deleta um curso existente
+// Deleta um curso existente e invalida o cache
 export async function deleteCourse(id: number) {
   await prisma.course.delete({
     where: { id },
   });
+
+  await invalidateCache();
 }
